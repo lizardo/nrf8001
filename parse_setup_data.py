@@ -20,6 +20,7 @@ import argparse
 from binascii import crc_hqx
 from pprint import pprint
 import struct
+from target_format import *
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parse nRF8001 setup data.")
@@ -29,7 +30,13 @@ if __name__ == "__main__":
 
     setup_data = None
     crc = 0xffff
+    version = None
     for line in args.report.readlines():
+        m = re.match("Generated with uBlue setup DLL version: 1.0.0.(\d+)$",
+                line.strip())
+        if m:
+            version = int(m.group(1))
+
         if line.strip() == "[Setup Data]":
             setup_data = {}
         if not line.strip() or setup_data is None:
@@ -60,3 +67,8 @@ if __name__ == "__main__":
 
     print("Setup Data:")
     pprint(setup_data)
+
+    print("\nTarget 0x00:")
+    target = Target_00.parse(setup_data[0x00].decode("hex"))
+    print(target)
+    assert target["dll_version"] == version
