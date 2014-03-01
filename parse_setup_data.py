@@ -44,7 +44,9 @@ if __name__ == "__main__":
         target = int(data[2], 16)
         if not setup_data.get(target):
             setup_data[target] = ""
-        setup_data[target] += "".join(data[3:])
+        # Offset into target
+        assert int(data[3], 16) == len(setup_data[target].decode("hex"))
+        setup_data[target] += "".join(data[4:])
 
         if target == 0xf0:
             # Remove existing CRC when calculating new CRC
