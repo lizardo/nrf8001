@@ -1,0 +1,16 @@
+This directory contains automated conformity tests for nRFgoStudio. The tests
+work by automating nRFgoStudio's UI using AutoIt3[1] and WINE[2]. The tests
+then generate output in TAP[3] format.
+
+To run the tests, you can use any test harness supporting TAP, e.g. "prove"[4]:
+
+$ cd tests/nrfgostudio/ && prove *.sh
+default.sh .. ok   
+All tests successful.
+Files=1, Tests=1,  8 wallclock secs ( 0.04 usr  0.00 sys +  0.37 cusr  0.60 csys =  1.01 CPU)
+Result: PASS
+
+[1] http://www.autoitscript.com/site/autoit/
+[2] http://www.winehq.org/
+[3] http://testanything.org/tap-specification.html
+[4] http://search.cpan.org/~leont/Test-Harness/bin/prove
