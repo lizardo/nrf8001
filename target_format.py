@@ -18,10 +18,206 @@ from binascii import crc_hqx
 import struct
 from construct import *
 
+# FlagsContainer and FlagsAdapter are copied from Construct, and a one-line fix
+# is applied to FlagsContainer as shown below.
+
+class FlagsContainer(Container):
+    def __pretty_str__(self, nesting = 1, indentation = "    "):
+        attrs = []
+        ind = indentation * nesting
+        for k in self.keys():
+            # This gives KeyError, so use getattr() instead
+            #v = self.__dict__[k]
+            v = getattr(self, k)
+            if not k.startswith("_") and v:
+                attrs.append(ind + k)
+        if not attrs:
+            return "%s()" % (self.__class__.__name__,)
+        attrs.insert(0, self.__class__.__name__+ ":")
+        return "\n".join(attrs)
+
+class FlagsAdapter(Adapter):
+    __slots__ = ["flags"]
+    def __init__(self, subcon, flags):
+        Adapter.__init__(self, subcon)
+        self.flags = flags
+    def _encode(self, obj, context):
+        flags = 0
+        for name, value in self.flags.items():
+            if getattr(obj, name, False):
+                flags |= value
+        return flags
+    def _decode(self, obj, context):
+        obj2 = FlagsContainer()
+        for name, value in self.flags.items():
+            setattr(obj2, name, bool(obj & value))
+        return obj2
+
+def CheckBox(subcon):
+    return Enum(subcon,
+        Disabled = 0,
+        Enabled = 1,
+    )
+
+def AdvBitmap(name):
+    return FlagsAdapter(UBInt16(name),
+        {
+            "Custom AD": 1 << 14,
+            "Service solicitation (GATT client)": 1 << 10,
+            "Slave connection interval range": 1 << 8,
+            "TX power level": 1 << 6,
+            "Local name - use shortened": 1 << 5,
+            "Local name - use complete": 1 << 4,
+            "Local services": 1 << 0,
+        },
+    )
+
+def AdvCustom(name):
+    return FlagsAdapter(UBInt8(name),
+        {
+            "Enable custom AD #1": 1,
+            "Enable custom AD #2": 2,
+        },
+    )
+
 Target_00 = Struct("Target_00",
-    Const(UBInt8("setup_format"), 3),
-    Const(UBInt8("unknown"), 2),
-    UBInt16("dll_version"),
+    Const(UBInt8("Setup format"), 3),
+    Const(UBInt8("Unknown"), 2),
+    UBInt16("DLL version"),
+    Terminator,
+)
+
+Target_10 = Struct("Target_10",
+    Const(Field("Unknown @ 0x00", 4), "\x00" * 4),
+    SymmetricMapping(UBInt8("Device security"),
+        {
+            "No security required": 0,
+               "Security required": 2,
+        },
+    ),
+    # FIXME: Number of remote services?
+    Const(UBInt8("Unknown @ 0x05"), 0),
+    CheckBox(UBInt8("Writeable device name (over the air)")),
+    Const(UBInt8("Unknown @ 0x07"), 0),
+    CheckBox(UBInt8("Writeable device name (from app controller)")),
+    SymmetricMapping(UBInt8("32 kHz clock source"),
+        {
+                   "External crystal": 0,
+             "Internal RC oscillator": 1,
+             "External analog source": 3,
+            "External digital source": 4,
+        },
+    ),
+    SymmetricMapping(UBInt8("32 kHz clock accuracy"),
+        {
+                 "250-500 PPM": 0,
+                 "150-250 PPM": 1,
+                 "100-150 PPM": 2,
+                  "75-100 PPM": 3,
+                   "50-75 PPM": 4,
+                   "30-50 PPM": 5,
+                   "20-30 PPM": 6,
+            "Less than 20 PPM": 7,
+        },
+    ),
+    Enum(UBInt8("16 MHz clock source"),
+        Crystal = 0,
+        Digital = 1,
+    ),
+    EmbeddedBitStruct(
+        BitField("Time before start", 6),
+        Enum(BitField("Active signal", 2),
+            Disable = 0,
+            Active_high = 1,
+            Active_low = 2,
+        ),
+    ),
+    EmbeddedBitStruct(
+        SymmetricMapping(BitField("Initial TX power", 7),
+            {
+                "-18 dBm": 0,
+                "-12 dBm": 1,
+                 "-6 dBm": 2,
+                  "0 dBm": 3,
+            },
+        ),
+        Flag("DC/DC converter"),
+    ),
+    SBInt8("External antenna gain"),
+    UBInt8("Bytes in shortened name"),
+    # FIXME: 0xC1 if Gapsettings/ServiceToAdvertise is not empty; 0x00 otherwise
+    Const(UBInt8("Unknown @ 0x10"), 0),
+    # FIXME: Gapsettings/ServiceToAdvertise (array of 16-bit Service UUIDs)
+    Const(Field("Unknown @ 0x11", 13), "\x00" * 13),
+    # FIXME: 0x01 if Gapsettings/SercieToSolicitate is not empty; 0x00 otherwise
+    Const(UBInt8("Unknown @ 0x1E"), 0),
+    # FIXME: Gapsettings/SercieToSolicitate (array of 16-bit Service UUIDs)
+    Const(Field("Unknown @ 0x1F", 15), "\x00" * 15),
+    AdvBitmap("ACI Bond Advertising"),
+    Const(Field("Unknown @ 0x30", 2), "\x00" * 2),
+    AdvBitmap("ACI Connect Advertising"),
+    EmbeddedBitStruct(
+        SymmetricMapping(Nibble("Required level of security"),
+            {
+                "Unauthenticated (Just Works)": 0,
+                     "Authenticated (Passkey)": 1,
+            },
+        ),
+        SymmetricMapping(Nibble("I/O capabilities"),
+            {
+                        "Display only": 0,
+                      "Display yes/no": 1,
+                       "Keyboard only": 2,
+                                "None": 3,
+                "Keyboard and display": 4,
+            },
+        ),
+    ),
+    EmbeddedBitStruct(
+        ExprAdapter(Nibble("Maximum encryption key size"),
+            encoder = lambda obj, ctx: obj - 7,
+            decoder = lambda obj, ctx: obj + 7,
+        ),
+        ExprAdapter(Nibble("Mininum encryption key size"),
+            encoder = lambda obj, ctx: obj - 7,
+            decoder = lambda obj, ctx: obj + 7,
+        ),
+    ),
+    Const(UBInt8("Unknown @ 0x36"), 0),
+    Enum(UBInt16("Dynamic window limiting"),
+        On = 0x0264,
+        Off = 0xffff,
+    ),
+    Const(UBInt8("Unknown @ 0x39"), 0xFF),
+    UBInt16("Bond timeout (seconds)"),
+    UBInt8("Security request delay (seconds)"),
+    Const(Field("Unknown @ 0x3D", 3), "\x05\x00\x00"),
+    AdvBitmap("ACI Bond Scan Response"),
+    Const(Field("Unknown @ 0x42", 2), "\x00" * 2),
+    AdvBitmap("ACI Connect Scan Response"),
+    Const(Field("Unknown @ 0x46", 2), "\x00" * 2),
+    AdvBitmap("ACI Broadcast Advertising"),
+    Const(Field("Unknown @ 0x4A", 2), "\x00" * 2),
+    AdvBitmap("ACI Broadcast Scan Response"),
+    AdvCustom("ACI Bond Advertising custom ADs"),
+    AdvCustom("ACI Bond Scan Response custom ADs"),
+    AdvCustom("ACI Connect Advertising custom ADs"),
+    AdvCustom("ACI Connect Scan Response custom ADs"),
+    AdvCustom("ACI Broadcast Advertising custom ADs"),
+    AdvCustom("ACI Broadcast Scan Response custom ADs"),
+    # FIXME: this field is set when Security is required, but not what it means
+    # individually. Maybe Whitelist?
+    IfThenElse("Security Required", lambda ctx: ctx["Device security"] ==
+            "Security required",
+        Const(UBInt8("Unknown @ 0x54"), 1),
+        Const(UBInt8("Unknown @ 0x54"), 0),
+    ),
+    FlagsAdapter(UBInt8("Available custom ADs"),
+        {
+            "Custom AD #1 is present": 1,
+            "Custom AD #2 is present": 2,
+        },
+    ),
     Terminator,
 )
 
@@ -45,7 +241,7 @@ def parse_setup(report_file):
         data = line.strip().split("-")
         assert int(data[0], 16) == len(data[1:])
         # Opcode: Setup (0x06)
-        assert data[1] == '06'
+        assert data[1] == "06"
         target = int(data[2], 16)
         if not setup_data.get(target):
             setup_data[target] = ""

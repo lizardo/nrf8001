@@ -33,4 +33,9 @@ if __name__ == "__main__":
     print("\nTarget 0x00:")
     target = Target_00.parse(setup_data[0x00].decode("hex"))
     print(target)
-    assert target["dll_version"] == version
+    assert target["DLL version"] == version
+
+    print("\nTarget 0x10:")
+    target = Target_10.parse(setup_data[0x10].decode("hex"))
+    print(target)
+
