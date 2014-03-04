@@ -39,3 +39,7 @@ if __name__ == "__main__":
     target = Target_10.parse(setup_data[0x10].decode("hex"))
     print(target)
 
+    print("\nTarget 0x20:")
+    target = Target_20.parse(setup_data[0x20].decode("hex"))
+    print(target)
+

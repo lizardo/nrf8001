@@ -207,7 +207,7 @@ Target_10 = Struct("Target_10",
     AdvCustom("ACI Broadcast Scan Response custom ADs"),
     # FIXME: this field is set when Security is required, but not what it means
     # individually. Maybe Whitelist?
-    IfThenElse("Security Required", lambda ctx: ctx["Device security"] ==
+    IfThenElse("Unknown @ 0x54", lambda ctx: ctx["Device security"] ==
             "Security required",
         Const(UBInt8("Unknown @ 0x54"), 1),
         Const(UBInt8("Unknown @ 0x54"), 0),
@@ -218,6 +218,49 @@ Target_10 = Struct("Target_10",
             "Custom AD #2 is present": 2,
         },
     ),
+    Terminator,
+)
+
+def UUID(name):
+    return SymmetricMapping(UBInt16(name),
+        {
+                                 "Device Name": 0x2A00,
+                                  "Appearance": 0x2A01,
+            "Peripheral Preferred Connection Parameters": 0x2A04,
+            "GATT primary service declaration": 0x2800,
+            "GATT characteristic declaration": 0x2803,
+        },
+    )
+
+def Attribute(name):
+    return Struct(name,
+        # FIXME: most likely there are bits for write and read permissions
+        UBInt8("Permissions #1"),
+        UBInt8("Permissions #2"),
+        # FIXME: It is not clear yet why there are two different length fields,
+        # but the field is selected based on the fields above.
+        UBInt8("Length #1"),
+        UBInt8("Length #2"),
+        UBInt16("Handle"),
+        UUID("Type"),
+        Const(UBInt8("Unknown"), 1),
+        # FIXME: It is still not clear how the value length is calculted.
+        IfThenElse("Value", lambda ctx: ctx["Permissions #1"] == 0x06,
+            Field("Value", lambda ctx: ctx["Length #2"]),
+            Field("Value", lambda ctx: ctx["Length #1"]),
+        ),
+    )
+
+Target_20 = Struct("Target_20",
+    Attribute("GAP service"),
+    Attribute("GAP Device Name characteristic"),
+    Attribute("GAP Device Name characteristic value"),
+    Attribute("GAP Appearance characteristic"),
+    Attribute("GAP Appearance characteristic value"),
+    Attribute("GAP PPCP characteristic declaration"),
+    Attribute("GAP PPCP characteristic value declaration"),
+    Attribute("GATT service"),
+    Const(UBInt8("Unknown"), 0),
     Terminator,
 )
 
