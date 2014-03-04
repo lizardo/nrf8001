@@ -264,6 +264,15 @@ Target_20 = Struct("Target_20",
     Terminator,
 )
 
+Target_F0 = Struct("Target_F0",
+    Enum(UBInt8("Configuration OTP locking"),
+        Enabled = 0x83,
+        Disabled = 0x03,
+    ),
+    UBInt16("16-bit CCITT CRC"),
+    Terminator,
+)
+
 def parse_setup(report_file):
     setup_data = None
     crc = 0xffff

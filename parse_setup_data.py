@@ -27,19 +27,23 @@ if __name__ == "__main__":
 
     version, setup_data = parse_setup(args.report)
 
-    print("Setup Data:")
+    print("Raw Setup Data:")
     pprint(setup_data)
 
-    print("\nTarget 0x00:")
+    print("\nTarget 0x00 (Version information):")
     target = Target_00.parse(setup_data[0x00].decode("hex"))
     print(target)
     assert target["DLL version"] == version
 
-    print("\nTarget 0x10:")
+    print("\nTarget 0x10 (GAP/Security/Hardware settings):")
     target = Target_10.parse(setup_data[0x10].decode("hex"))
     print(target)
 
-    print("\nTarget 0x20:")
+    print("\nTarget 0x20 (Attribute database):")
     target = Target_20.parse(setup_data[0x20].decode("hex"))
+    print(target)
+
+    print("\nTarget 0xF0 (Locking & CRC):")
+    target = Target_F0.parse(setup_data[0xF0].decode("hex"))
     print(target)
 
