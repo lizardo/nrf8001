@@ -41,5 +41,5 @@ example.
 License
 =======
 
-All code is released under the terms of the GNU GPL v2. See LICENSE file for
-details.
+All code and documentation is licensed under the terms of the OSI-approved MIT
+license. See LICENSE file for details.
