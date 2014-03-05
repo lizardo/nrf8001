@@ -62,11 +62,3 @@ if __name__ == "__main__":
         elif len(d1) < len(d2):
             print("[0x%02X] Bytes only in %s: %s" % (target,
                 args.report[1].name, " ".join("%02X" % i for i in d2[offset + 1:])))
-
-#    print("Setup Data:")
-#    pprint(setup_data)
-#
-#    print("\nTarget 0x00:")
-#    target = Target_00.parse(setup_data[0x00].decode("hex"))
-#    print(target)
-#    assert target["dll_version"] == version
